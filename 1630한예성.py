@@ -3,6 +3,8 @@ import math
 import random
 import sys
 import os
+import requests
+from io import BytesIO
 
 pygame.init()
 
@@ -26,41 +28,44 @@ try:
 except pygame.error:
     font = pygame.font.Font(None, 30)
 
-# --- IMAGE LOADING (new) ---
-IMAGE_DIR = os.path.join(os.path.dirname(__file__), "Img")
+# --- IMAGE LOADING FROM GITHUB RAW ---
+RAW_BASE = f"https://raw.githubusercontent.com/Ayeseong/programming_game_lib/main/Img"
 
-def load_image(name):
-    path = os.path.join(IMAGE_DIR, name)
+def load_image_from_github(filename):
+    url = f"{RAW_BASE}/{filename}"
     try:
-        return pygame.image.load(path).convert_alpha()
-    except Exception:
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        # BytesIO로 감싸서 pygame.image.load에 넘긴다.
+        img = pygame.image.load(BytesIO(resp.content)).convert_alpha()
+        return img
+    except Exception as e:
+        print(f"[WARN] GitHub 이미지 로드 실패: {url} ({e})")
         return None
 
-# keys: 'player','axe','sword','spear','knife','wand','bow',
-#        'spear_effect','sword_effect','wand_effect'
 IMAGES = {
-    'player': load_image("player.png"),
-    'axe': load_image("axe.png"),
-    'sword': load_image("sword.png"),
-    'spear': load_image("spear.png"),
-    'knife': load_image("knife.png"),
-    'wand': load_image("wand.png"),
-    'bow': load_image("bow.png"),
-    'spear_effect': load_image("spear_effect.png"),
-    'sword_effect': load_image("sword_effect.png"),
-    'wand_effect': load_image("wand_effect.png"),
+    'player': load_image_from_github("player.png"),
+    'axe': load_image_from_github("axe.png"),
+    'sword': load_image_from_github("sword.png"),
+    'spear': load_image_from_github("spear.png"),
+    'knife': load_image_from_github("knife.png"),
+    'wand': load_image_from_github("wand.png"),
+    'bow': load_image_from_github("bow.png"),
+    'spear_effect': load_image_from_github("spear_effect.png"),
+    'sword_effect': load_image_from_github("sword_effect.png"),
+    'wand_effect': load_image_from_github("wand_effect.png"),
 }
-# add new image loads (motion + projectile)
+
 IMAGES.update({
-    'sword_motion': load_image("sword_motion.png"),
-    'spear_motion': load_image("spear_motion.png"),
-    'axe_motion': load_image("axe_motion.png"),
-    'wand_projectile': load_image("wand_projectile.png"),
-    'bow_projectile': load_image("bow_projectile.png"),
-    # treasure sprites
-    'treasure_closed': load_image("treasure_closed.png"),
-    'treasure_opened': load_image("treasure_opened.png"),
+    'sword_motion': load_image_from_github("sword_motion.png"),
+    'spear_motion': load_image_from_github("spear_motion.png"),
+    'axe_motion': load_image_from_github("axe_motion.png"),
+    'wand_projectile': load_image_from_github("wand_projectile.png"),
+    'bow_projectile': load_image_from_github("bow_projectile.png"),
+    'treasure_closed': load_image_from_github("treasure_closed.png"),
+    'treasure_opened': load_image_from_github("treasure_opened.png"),
 })
+
 # --- end image loading ---
 
 class Weapon:
