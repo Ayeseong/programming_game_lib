@@ -1,7 +1,19 @@
+import sys
+import subprocess
+
+def ensure_packages(packages):
+    for pkg in packages:
+        try:
+            __import__(pkg)
+        except ImportError:
+            print(f"[INFO] '{pkg}' 모듈이 없어 설치를 시도합니다")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+
+ensure_packages(["pygame", "requests"])
+
 import pygame
 import math
 import random
-import sys
 import os
 import requests
 from io import BytesIO
@@ -15,91 +27,131 @@ clock = pygame.time.Clock()
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-BLUE = (50, 100, 255)
-RED = (200, 50, 50)
 GRAY = (100, 100, 100)
 GREEN = (50, 200, 50)
+RED = (200, 50, 50)
 YELLOW = (240, 200, 50)
 LIGHT_GRAY = (150, 150, 150)
+BLUE = (50, 100, 255)
 ORANGE = (255, 150, 50)
 
-try:
-    font = pygame.font.SysFont('Noto sans KR', 25)
-except pygame.error:
-    font = pygame.font.Font(None, 30)
+HELP_TEXTS = [
+    "클릭하여 다음 도움말을 확인하세요",
+    "게임에 필요한 이미지를 Github에서 불러오고 있습니다",
+    "이미지 파일이 저장되지는 않으니 안심하세요",
+    "이 게임은 wasd, 그리고 마우스 좌클릭으로 조작합니다",
+    "게임 캐릭터는 마우스 포인터 방향을 항상 바라봅니다",
+    "방은 몬스터방, 보물방, 보스방이 있습니다",
+    "보스를 처치하면 게임을 클리어 합니다"
 
-# --- IMAGE LOADING FROM GITHUB RAW ---
-RAW_BASE = f"https://raw.githubusercontent.com/Ayeseong/programming_game_lib/main/Img"
+]
 
+def show_loading_screen(current=0, total=0, dots=0, help_idx=0):
+    screen.fill(BLACK)
+    font = pygame.font.SysFont('Noto sans KR', 36)
+    msg = "이미지 불러오는 중..."
+    text = font.render(msg, True, WHITE)
+    screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//2 - 95))
+    dot_strs = ["", ".", "..", "..."]
+    dot_text = font.render(dot_strs[dots % 4], True, WHITE)
+    screen.blit(dot_text, (WIDTH//2 - dot_text.get_width()//2, HEIGHT//2 - 40))
+    if total > 0:
+        prog_msg = f"{current}/{total}"
+        prog_text = font.render(prog_msg, True, WHITE)
+        screen.blit(prog_text, (WIDTH//2 - prog_text.get_width()//2, HEIGHT//2))
+    help_font = pygame.font.SysFont('Noto sans KR', 24)
+    help_lines = HELP_TEXTS[help_idx % len(HELP_TEXTS)].split('\n')
+    for i, hline in enumerate(help_lines):
+        help_text = help_font.render(hline, True, LIGHT_GRAY)
+        screen.blit(help_text, (WIDTH//2 - help_text.get_width()//2, HEIGHT//2 + 60 + i*32))
+    pygame.display.flip()
+
+def load_images_with_ui(image_files):
+    images = {}
+    total = len(image_files)
+    help_idx = 0
+    dots = 0
+    for idx, key_fname in enumerate(image_files):
+        for i in range(12):
+            show_loading_screen(idx+1, total, dots, help_idx)
+            pygame.time.delay(50)
+            dots += 1
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit(); sys.exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    help_idx += 1
+        key, fname = key_fname
+        images[key] = load_image_from_github(fname)
+    return images
+
+GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH = "Ayeseong", "programming_game_lib", "main"
+RAW_BASE = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/Img"
 def load_image_from_github(filename):
     url = f"{RAW_BASE}/{filename}"
     try:
         resp = requests.get(url, timeout=5)
         resp.raise_for_status()
-        # BytesIO로 감싸서 pygame.image.load에 넘긴다.
         img = pygame.image.load(BytesIO(resp.content)).convert_alpha()
         return img
     except Exception as e:
         print(f"[WARN] GitHub 이미지 로드 실패: {url} ({e})")
         return None
 
-IMAGES = {
-    'player': load_image_from_github("player.png"),
-    'axe': load_image_from_github("axe.png"),
-    'sword': load_image_from_github("sword.png"),
-    'spear': load_image_from_github("spear.png"),
-    'knife': load_image_from_github("knife.png"),
-    'wand': load_image_from_github("wand.png"),
-    'bow': load_image_from_github("bow.png"),
-    'spear_effect': load_image_from_github("spear_effect.png"),
-    'sword_effect': load_image_from_github("sword_effect.png"),
-    'wand_effect': load_image_from_github("wand_effect.png"),
-}
+IMAGE_FILES = [
+    ('player', 'player.png'),
+    ('axe', 'axe.png'),
+    ('sword', 'sword.png'),
+    ('spear', 'spear.png'),
+    ('knife', 'knife.png'),
+    ('wand', 'wand.png'),
+    ('bow', 'bow.png'),
+    ('spear_effect', 'spear_effect.png'),
+    ('sword_effect', 'sword_effect.png'),
+    ('wand_effect', 'wand_effect.png'),
+    ('sword_motion', 'sword_motion.png'),
+    ('spear_motion', 'spear_motion.png'),
+    ('axe_motion', 'axe_motion.png'),
+    ('wand_projectile', 'wand_projectile.png'),
+    ('bow_projectile', 'bow_projectile.png'),
+    ('treasure_closed', 'treasure_closed.png'),
+    ('treasure_opened', 'treasure_opened.png'),
+]
+try:
+    font = pygame.font.SysFont('Noto sans KR', 25)
+except pygame.error:
+    font = pygame.font.Font(None, 30)
 
-IMAGES.update({
-    'sword_motion': load_image_from_github("sword_motion.png"),
-    'spear_motion': load_image_from_github("spear_motion.png"),
-    'axe_motion': load_image_from_github("axe_motion.png"),
-    'wand_projectile': load_image_from_github("wand_projectile.png"),
-    'bow_projectile': load_image_from_github("bow_projectile.png"),
-    'treasure_closed': load_image_from_github("treasure_closed.png"),
-    'treasure_opened': load_image_from_github("treasure_opened.png"),
-})
-
-# --- end image loading ---
+IMAGES = load_images_with_ui(IMAGE_FILES)
 
 class Weapon:
     def __init__(self, name, attack_damage, wtype="melee", attack_range=70, attack_angle=90, projectile_speed=10, cooldown=20, shape="rect"):
         self.name = name
         self.attack_damage = attack_damage
-        self.type = wtype 
+        self.type = wtype
         self.attack_range = attack_range
         self.attack_angle = attack_angle
         self.projectile_speed = projectile_speed
         self.cooldown = cooldown
-        self.shape = shape 
-
+        self.shape = shape
 
 WEAPON_PREFABS = [
-    Weapon("Basic Sword", 10, wtype="melee", attack_range=100, attack_angle=90, cooldown=20, shape="sword"),
-    Weapon("Iron Axe", 14, wtype="melee", attack_range=80, attack_angle=70, cooldown=28, shape="axe"),
-    Weapon("Short Spear", 12, wtype="melee", attack_range=130, attack_angle=40, cooldown=26, shape="spear"),
-    Weapon("Short Bow", 9, wtype="ranged", attack_range=350, projectile_speed=12, cooldown=100, shape="bow"),
-    Weapon("Wand", 8, wtype="ranged", attack_range=400, projectile_speed=15, cooldown=12, shape="wand"),
-    Weapon("Throwing Knife", 11, wtype="ranged", attack_range=420, projectile_speed=18, cooldown=30, shape="knife"),
+    Weapon("어쿠스틱 기타", 10, wtype="melee", attack_range=100, attack_angle=90, cooldown=20, shape="sword"),
+    Weapon("피아노 조율용 도끼", 14, wtype="melee", attack_range=80, attack_angle=70, cooldown=28, shape="axe"),
+    Weapon("드럼 스틱", 12, wtype="melee", attack_range=130, attack_angle=40, cooldown=26, shape="spear"),
+    Weapon("바이올린", 9, wtype="ranged", attack_range=350, projectile_speed=12, cooldown=100, shape="bow"),
+    Weapon("보컬 마이크", 8, wtype="ranged", attack_range=400, projectile_speed=15, cooldown=12, shape="wand"),
+    Weapon("단검", 11, wtype="ranged", attack_range=420, projectile_speed=18, cooldown=30, shape="knife"),
 ]
-
 
 class Player:
     def __init__(self, x=None, y=None):
-
         self.size = 40
         if x is None:
             x = WIDTH // 2 - self.size // 2
         if y is None:
             y = HEIGHT // 2 - self.size // 2
         self.x, self.y = x, y
-        self.color = BLUE
         self.speed = 5
         self.hp = 100
         self.max_hp = 100
@@ -109,7 +161,7 @@ class Player:
         self.attack_range = 70
         self.last_effect_time = 0
         self.last_effect_text = ""
-        self.weapon = Weapon("Short Bow", 9, wtype="ranged", attack_range=350, projectile_speed=12, cooldown=100, shape="bow")
+        self.weapon = Weapon("어쿠스틱 기타", 10, wtype="melee", attack_range=100, attack_angle=90, cooldown=20, shape="sword")
         self.facing_angle = 0.0
 
     def handle_input(self):
@@ -125,30 +177,20 @@ class Player:
         self.last_effect_time = pygame.time.get_ticks()
 
     def attack(self, enemies, projectiles, effects):
-        # modified to accept effects list so we can spawn impact effects
         if self.attack_cooldown > 0:
             return
         w = self.weapon
         cx = self.x + self.size / 2
         cy = self.y + self.size / 2
-
-        # --- spawn melee motion effect at attack start (if available) ---
         if w.type == "melee":
             motion_name = None
-            if w.shape == "sword":
-                motion_name = "sword_motion"
-            elif w.shape == "spear":
-                motion_name = "spear_motion"
-            elif w.shape == "axe":
-                motion_name = "axe_motion"   # added axe motion mapping
+            if w.shape == "sword": motion_name = "sword_motion"
+            elif w.shape == "spear": motion_name = "spear_motion"
+            elif w.shape == "axe": motion_name = "axe_motion"
             if motion_name:
-                # position slightly in front of player
                 mx = cx + math.cos(self.facing_angle) * (self.size * 0.75)
                 my = cy + math.sin(self.facing_angle) * (self.size * 0.75)
-                # shorter lifetime for motion; pass facing angle so motion rotates correctly
                 effects.append(Effect(mx, my, IMAGES.get(motion_name), lifetime=220, angle=self.facing_angle))
-        # --- end motion spawn ---
-
         if w.type == "melee":
             for enemy in enemies:
                 if not enemy.alive: continue
@@ -163,29 +205,22 @@ class Player:
                     diff = (angle_to_enemy - facing_deg + 180) % 360 - 180
                     if abs(diff) <= w.attack_angle / 2:
                         enemy.take_damage(w.attack_damage)
-                        # spawn hit effect at enemy center (based on weapon shape)
                         eff_name = None
-                        if w.shape == "spear":
-                            eff_name = "spear_effect"
-                        elif w.shape == "sword":
-                            eff_name = "sword_effect"
-                        elif w.shape == "wand":
-                            eff_name = "wand_effect"
+                        if w.shape == "spear": eff_name = "spear_effect"
+                        elif w.shape == "sword": eff_name = "sword_effect"
+                        elif w.shape == "wand": eff_name = "wand_effect"
                         if eff_name:
-                            # rotate hit effect by player's facing so it matches attack orientation
                             effects.append(Effect(ex, ey, IMAGES.get(eff_name), angle=self.facing_angle))
                         if dist != 0:
                             kb = self.knockback
                             enemy.x += (dx / dist) * kb
                             enemy.y += (dy / dist) * kb
         else:
-            dir_x = math.cos(self.facing_angle)
-            dir_y = math.sin(self.facing_angle)
+            dir_x, dir_y = math.cos(self.facing_angle), math.sin(self.facing_angle)
             px = cx + dir_x * (self.size / 2 + 5)
             py = cy + dir_y * (self.size / 2 + 5)
             proj = Projectile(px, py, dir_x, dir_y, w.projectile_speed, w.attack_damage, shape=w.shape)
             projectiles.append(proj)
-
         self.attack_cooldown = w.cooldown
 
     def update(self):
@@ -207,10 +242,7 @@ class Player:
             text = "이동속도 +0.5!"
         elif item_type == "heal":
             self.hp = min(self.max_hp, self.hp + 20)
-            text = "체력 +20!"
-        elif item_type == "spd_down":
-            self.speed = max(1, self.speed - 0.3)
-            text = "이동속도 -0.3..."
+            text = "체력회복 +20!"
         else:
             text = ""
         self.last_effect_text = text
@@ -219,8 +251,6 @@ class Player:
     def draw(self, surface):
         cx = self.x + self.size / 2
         cy = self.y + self.size / 2
-
-        # If player image available, blit rotated scaled version, else fallback
         p_img = IMAGES.get('player')
         if p_img:
             target_size = (self.size, self.size)
@@ -231,14 +261,12 @@ class Player:
             surface.blit(rotated, rect.topleft)
         else:
             body_surf = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
-            pygame.draw.rect(body_surf, self.color, (0, 0, self.size, self.size))
+            pygame.draw.rect(body_surf, BLUE, (0, 0, self.size, self.size))
             deg = -math.degrees(self.facing_angle) + 90
             rotated = pygame.transform.rotate(body_surf, deg)
             rect = rotated.get_rect(center=(cx, cy))
             surface.blit(rotated, rect.topleft)
-
         draw_weapon_visual(surface, (cx, cy), self.facing_angle, self.weapon, self.size)
-
         self.draw_health_bar(surface)
 
     def draw_health_bar(self, surface):
@@ -251,13 +279,10 @@ class Player:
         pygame.draw.rect(surface, GREEN, (x, y, bar_width * hp_ratio, bar_height))
 
 def draw_weapon_visual(surface, center, facing_angle, weapon, player_size):
-    """Use PNGs for weapons when available, fallback to simple shapes."""
     cx, cy = center
-    # desired size for weapon sprite (relative to player)
     desired = int(player_size * 1.2)
     img = IMAGES.get(weapon.shape)
     if img:
-        # maintain aspect ratio, scale so max dimension ~ desired
         iw, ih = img.get_size()
         scale = desired / max(iw, ih)
         new_w, new_h = max(1, int(iw * scale)), max(1, int(ih * scale))
@@ -267,8 +292,6 @@ def draw_weapon_visual(surface, center, facing_angle, weapon, player_size):
         rect = rotated.get_rect(center=(cx + math.cos(facing_angle)*(player_size*0.45), cy + math.sin(facing_angle)*(player_size*0.45)))
         surface.blit(rotated, rect.topleft)
         return
-
-    # fallback: existing simple shape drawing
     size = int(player_size * 0.9)
     ws = int(size * 1.2)
     surf = pygame.Surface((ws, ws), pygame.SRCALPHA)
@@ -319,7 +342,6 @@ class Enemy:
         if distance > 0:
             self.x += (dx / distance) * self.speed
             self.y += (dy / distance) * self.speed
-
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
         elif distance < self.attack_range:
@@ -346,23 +368,22 @@ class Enemy:
         pygame.draw.rect(surface, GREEN, (x, y, bar_width * hp_ratio, bar_height))
 
 class Treasure:
-    def __init__(self, x, y):
+    def __init__(self, x, y, current_weapon_name=None):
         self.x, self.y = x, y
         self.size = 30
         self.color = YELLOW
-        self.type = random.choice(["atk_up", "spd_up", "heal", "spd_down"])
+        self.type = random.choice(["atk_up", "spd_up", "heal"])
         self.collected = False
-        self.opened = False                          # new: whether chest has been opened
-        self.rewarded = False                        # new: whether reward has been granted (doesn't hide chest)
-        if random.random() < 0.5:
-            prefab = random.choice(WEAPON_PREFABS)
+        self.opened = False
+        self.rewarded = False
+        weapon_choices = [w for w in WEAPON_PREFABS if w.name != current_weapon_name]
+        if random.random() < 0.5 and weapon_choices:
+            prefab = random.choice(weapon_choices)
             self.weapon = Weapon(prefab.name, prefab.attack_damage, prefab.type, prefab.attack_range, prefab.attack_angle, prefab.projectile_speed, prefab.cooldown, shape=prefab.shape)
         else:
             self.weapon = None
 
     def draw(self, surface):
-        # Always draw the chest (closed or opened). It no longer disappears after reward.
-        # draw closed/opened chest image if available, else fallback circle
         key = 'treasure_opened' if self.opened else 'treasure_closed'
         img = IMAGES.get(key)
         if img:
@@ -372,12 +393,11 @@ class Treasure:
             img_s = pygame.transform.smoothscale(img, (max(1,int(iw*scale)), max(1,int(ih*scale))))
             surface.blit(img_s, (self.x - img_s.get_width()//2, self.y - img_s.get_height()//2))
         else:
-            # fallback: simple circle (closed = YELLOW, opened = LIGHT_GRAY)
             col = LIGHT_GRAY if self.opened else self.color
             pygame.draw.circle(surface, col, (self.x, self.y), self.size // 2)
 
 class Room:
-    def __init__(self, room_type="monster", is_boss=False, coord=(0,0), dungeon_size=5):
+    def __init__(self, room_type="monster", is_boss=False, coord=(0,0), dungeon_size=5, current_weapon_name=None):
         self.room_type = room_type
         self.is_boss = is_boss
         self.coord = coord
@@ -390,67 +410,60 @@ class Room:
         elif self.room_type == "monster":
             self.enemies = [Enemy(random.randint(100, 700), random.randint(100, 500)) for _ in range(random.randint(2, 4))]
         elif self.room_type == "treasure":
-            # spawn chest at a random corner (with small margin from edges)
             margin = 60
             corners = [
-                (WIDTH - margin, margin),              # top-right
-                (margin, HEIGHT - margin),             # bottom-left
-                (WIDTH - margin, HEIGHT - margin),     # bottom-right
+                (WIDTH - margin, margin),
+                (margin, HEIGHT - margin),
+                (WIDTH - margin, HEIGHT - margin),
             ]
             tx, ty = random.choice(corners)
-            self.treasure = Treasure(tx, ty)
-
+            self.treasure = Treasure(tx, ty, current_weapon_name)
         x_idx, y_idx = coord
         self.doors = {}
-        if y_idx > 0:
-            self.doors["up"] = pygame.Rect(WIDTH//2 - 40, 0, 80, 20)
-        if y_idx < dungeon_size - 1:
-            self.doors["down"] = pygame.Rect(WIDTH//2 - 40, HEIGHT - 20, 80, 20)
-        if x_idx > 0:
-            self.doors["left"] = pygame.Rect(0, HEIGHT//2 - 40, 20, 80)
-        if x_idx < dungeon_size - 1:
-            self.doors["right"] = pygame.Rect(WIDTH - 20, HEIGHT//2 - 40, 20, 80)
+        if y_idx > 0: self.doors["up"] = pygame.Rect(WIDTH//2 - 40, 0, 80, 20)
+        if y_idx < dungeon_size - 1: self.doors["down"] = pygame.Rect(WIDTH//2 - 40, HEIGHT - 20, 80, 20)
+        if x_idx > 0: self.doors["left"] = pygame.Rect(0, HEIGHT//2 - 40, 20, 80)
+        if x_idx < dungeon_size - 1: self.doors["right"] = pygame.Rect(WIDTH - 20, HEIGHT//2 - 40, 20, 80)
 
     def update(self, player):
         for enemy in self.enemies:
             enemy.update(player)
-
     def draw(self, surface):
         pygame.draw.rect(surface, (30, 30, 30), (0, 0, WIDTH, HEIGHT))
-        for rect in self.doors.values():
-            pygame.draw.rect(surface, YELLOW, rect)
+        for rect in self.doors.values(): pygame.draw.rect(surface, YELLOW, rect)
         if self.room_type == "monster" or self.is_boss:
-            for enemy in self.enemies:
-                enemy.draw(surface)
+            for enemy in self.enemies: enemy.draw(surface)
         elif self.room_type == "treasure" and self.treasure:
-            # always draw treasure (opened or closed), even after reward
             self.treasure.draw(surface)
 
 class Dungeon:
-    def __init__(self, difficulty):
+    def __init__(self, difficulty, current_weapon_name):
         self.rooms = {}
         self.size = {"EASY": 5, "NORMAL": 7, "HARD": 11}[difficulty]
+        self.room_coords = [(x, y) for x in range(self.size) for y in range(self.size)]
         self.current_room = (self.size // 2, self.size // 2)
         self.visited = set()
-        self.generate_rooms()
+        self.generate_rooms(current_weapon_name)
 
-    def generate_rooms(self):
-        coords = [(x, y) for x in range(self.size) for y in range(self.size)]
-        start_room = (self.size // 2, self.size // 2)
-        corners = [(0, 0), (0, self.size-1), (self.size-1, 0), (self.size-1, self.size-1)]
-        boss_pos = random.choice([c for c in corners if c != start_room])
+    def generate_rooms(self, current_weapon_name):
+        coords = self.room_coords.copy()
+        total_rooms = len(coords)
+        start_room = self.current_room
+        boss_pos = coords[-1]
+        treasure_count = max(1, int(round(total_rooms * 0.2)))
+        selectable_rooms = [c for c in coords if c != boss_pos and c != start_room]
+        treasure_coords = random.sample(selectable_rooms, treasure_count)
         for coord in coords:
             if coord == boss_pos:
                 self.rooms[coord] = Room("monster", is_boss=True, coord=coord, dungeon_size=self.size)
+            elif coord == start_room:
+                self.rooms[coord] = Room("empty", coord=coord, dungeon_size=self.size)
+            elif coord in treasure_coords:
+                self.rooms[coord] = Room("treasure", coord=coord, dungeon_size=self.size, current_weapon_name=current_weapon_name)
             else:
-                if coord == start_room:
-                    self.rooms[coord] = Room("empty", coord=coord, dungeon_size=self.size)
-                else:
-                    self.rooms[coord] = Room(random.choice(["monster", "treasure"]), coord=coord, dungeon_size=self.size)
+                self.rooms[coord] = Room("monster", coord=coord, dungeon_size=self.size)
 
-    def get_room(self, coord):
-        return self.rooms[coord]
-
+    def get_room(self, coord): return self.rooms[coord]
     def move_room(self, direction):
         x, y = self.current_room
         if direction == "up": y -= 1
@@ -485,30 +498,22 @@ def draw_stats(surface, player):
 
 class Projectile:
     def __init__(self, x, y, dir_x, dir_y, speed, damage, radius=6, shape=None):
-        self.x = x
-        self.y = y
+        self.x, self.y = x, y
         length = math.hypot(dir_x, dir_y)
-        if length == 0:
-            self.dx, self.dy = 1, 0
-        else:
-            self.dx, self.dy = dir_x / length, dir_y / length
+        self.dx, self.dy = (dir_x / length, dir_y / length) if length != 0 else (1, 0)
         self.speed = speed
         self.damage = damage
         self.radius = radius
         self.alive = True
-        self.shape = shape  # store shape to spawn appropriate effect on hit
+        self.shape = shape
 
     def update(self, enemies, effects, room=None):
         if not self.alive: return
         self.x += self.dx * self.speed
         self.y += self.dy * self.speed
-
-        # quick OOB kill (far out)
         if self.x < -50 or self.x > WIDTH + 50 or self.y < -50 or self.y > HEIGHT + 50:
             self.alive = False
             return
-
-        # enemy collisions: bow pierces (does not die), others behave as before
         for enemy in enemies:
             if not enemy.alive: continue
             ecx = enemy.x + enemy.size / 2
@@ -516,55 +521,36 @@ class Projectile:
             dist = math.hypot(self.x - ecx, self.y - ecy)
             if dist <= self.radius + max(enemy.size, enemy.size) / 2 * 0.5:
                 enemy.take_damage(self.damage)
-                # spawn effect based on projectile shape (unchanged)
                 eff_name = None
-                if self.shape == "wand":
-                    eff_name = "wand_effect"
-                elif self.shape == "spear":
-                    eff_name = "spear_effect"
-                elif self.shape == "sword":
-                    eff_name = "sword_effect"
+                if self.shape == "wand": eff_name = "wand_effect"
+                elif self.shape == "spear": eff_name = "spear_effect"
+                elif self.shape == "sword": eff_name = "sword_effect"
                 if eff_name:
                     effects.append(Effect(ecx, ecy, IMAGES.get(eff_name), angle=math.atan2(self.dy, self.dx)))
-                # If shape is NOT bow, projectile dies on hit. Bow penetrates.
                 if self.shape != "bow":
                     self.alive = False
                     break
-                # else continue (pierce)
-
-        # wall collision handling for bow: if bow projectile reaches room wall band and not at a door -> die
         if self.alive and room is not None and self.shape == "bow":
-            # top wall
             if self.y <= 20:
                 door_up = room.doors.get("up")
                 if not (door_up and door_up.collidepoint(self.x, self.y)):
-                    self.alive = False
-                    return
-            # bottom wall
+                    self.alive = False; return
             if self.y >= HEIGHT - 20:
                 door_down = room.doors.get("down")
                 if not (door_down and door_down.collidepoint(self.x, self.y)):
-                    self.alive = False
-                    return
-            # left wall
+                    self.alive = False; return
             if self.x <= 20:
                 door_left = room.doors.get("left")
                 if not (door_left and door_left.collidepoint(self.x, self.y)):
-                    self.alive = False
-                    return
-            # right wall
+                    self.alive = False; return
             if self.x >= WIDTH - 20:
                 door_right = room.doors.get("right")
                 if not (door_right and door_right.collidepoint(self.x, self.y)):
-                    self.alive = False
-                    return
+                    self.alive = False; return
 
     def draw(self, surface):
         if not self.alive: return
-        # prefer a dedicated projectile image (e.g., wand_projectile), then fallback to weapon image
-        proj_img = None
-        if self.shape:
-            proj_img = IMAGES.get(f"{self.shape}_projectile") or IMAGES.get(self.shape)
+        proj_img = IMAGES.get(f"{self.shape}_projectile") or IMAGES.get(self.shape) if self.shape else None
         if proj_img:
             iw, ih = proj_img.get_size()
             scale = max(1, int(self.radius*2))
@@ -576,7 +562,6 @@ class Projectile:
             return
         pygame.draw.circle(surface, LIGHT_GRAY, (int(self.x), int(self.y)), self.radius)
 
-# --- NEW EFFECT CLASS (modified) ---
 class Effect:
     def __init__(self, x, y, image=None, lifetime=400, angle=0):
         self.x = x
@@ -584,27 +569,23 @@ class Effect:
         self.image = image
         self.lifetime = lifetime
         self.start = pygame.time.get_ticks()
-        self.angle = angle  # radians
+        self.angle = angle
 
     def update(self):
         return pygame.time.get_ticks() - self.start >= self.lifetime
 
     def draw(self, surface):
         if self.image:
-            # scale to a reasonable size
             iw, ih = self.image.get_size()
             target = 48
             scale = target / max(iw, ih)
             img_s = pygame.transform.smoothscale(self.image, (max(1,int(iw*scale)), max(1,int(ih*scale))))
-            # rotate according to angle (convert radians -> degrees)
             deg = -math.degrees(self.angle)
             rotated = pygame.transform.rotate(img_s, deg)
             surface.blit(rotated, (self.x - rotated.get_width()//2, self.y - rotated.get_height()//2))
         else:
             pygame.draw.circle(surface, YELLOW, (int(self.x), int(self.y)), 10)
-# --- end Effect class ---
 
-# --- new: GUI difficulty selection ---
 def select_difficulty():
     btn_w, btn_h = 220, 60
     spacing = 20
@@ -613,7 +594,6 @@ def select_difficulty():
     start_y = HEIGHT // 2 - total_h // 2
     while True:
         screen.fill(BLACK)
-        # title
         title = font.render("Select Difficulty", True, YELLOW)
         screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4 - title.get_height()//2))
 
@@ -629,11 +609,7 @@ def select_difficulty():
             x = WIDTH // 2 - btn_w // 2
             y = start_y + i * (btn_h + spacing)
             rect = pygame.Rect(x, y, btn_w, btn_h)
-            # hover
-            if rect.collidepoint(mx, my):
-                color = LIGHT_GRAY
-            else:
-                color = GRAY
+            color = LIGHT_GRAY if rect.collidepoint(mx, my) else GRAY
             pygame.draw.rect(screen, color, rect, border_radius=8)
             txt = font.render(label, True, WHITE)
             screen.blit(txt, (x + btn_w//2 - txt.get_width()//2, y + btn_h//2 - txt.get_height()//2))
@@ -645,21 +621,19 @@ def select_difficulty():
 
         pygame.display.flip()
         clock.tick(60)
-# --- end select_difficulty ---
 
 def main():
-    # show GUI menu to choose difficulty
     difficulty = select_difficulty()
     if difficulty not in ["EASY", "NORMAL", "HARD"]:
         difficulty = "EASY"
 
     player = Player()
-    dungeon = Dungeon(difficulty)
+    dungeon = Dungeon(difficulty, player.weapon.name)
     dungeon.visited.add(dungeon.current_room)
 
     treasure_modal = None
     projectiles = []
-    effects = []   # <-- new: active visual effects list
+    effects = []
 
     running = True
     while running:
@@ -669,23 +643,20 @@ def main():
                 pygame.quit(); sys.exit()
             if treasure_modal:
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_y:  # 장착
+                    if event.key == pygame.K_y:
                         player.equip_weapon(treasure_modal['weapon'])
-                        # mark as rewarded but keep chest visible
                         treasure_modal['room'].treasure.rewarded = True
                         treasure_modal['room'].treasure.opened = True
                         treasure_modal = None
-                    elif event.key == pygame.K_n:  # 유지
-                        # keep current weapon, mark chest rewarded so it won't re-trigger
+                    elif event.key == pygame.K_n:
                         treasure_modal['room'].treasure.rewarded = True
                         treasure_modal['room'].treasure.opened = True
                         player.last_effect_text = "기존 무기 유지"
                         player.last_effect_time = pygame.time.get_ticks()
                         treasure_modal = None
-                continue 
+                continue
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 room = dungeon.get_room(dungeon.current_room)
-                # pass effects list to spawn hit effects
                 player.attack(room.enemies, projectiles, effects)
 
         room = dungeon.get_room(dungeon.current_room)
@@ -695,7 +666,7 @@ def main():
             player.update()
             room.update(player)
             for p in projectiles:
-                p.update(room.enemies, effects, room)   # pass effects + room for wall checks
+                p.update(room.enemies, effects, room)
             projectiles = [p for p in projectiles if p.alive]
 
         if player.hp <= 0:
@@ -711,22 +682,17 @@ def main():
 
         if room.room_type == "treasure" and room.treasure and not room.treasure.collected:
             player_rect = pygame.Rect(player.x, player.y, player.size, player.size)
-            # use treasure.size to form collision box
             half = room.treasure.size // 2
             treasure_rect = pygame.Rect(room.treasure.x - half, room.treasure.y - half, room.treasure.size, room.treasure.size)
             if player_rect.colliderect(treasure_rect):
-                # on first contact, open chest (if not already opened)
                 if not room.treasure.opened:
                     room.treasure.opened = True
                     if room.treasure.weapon:
-                        # show weapon choice modal after opening
                         treasure_modal = {'weapon': room.treasure.weapon, 'room': room}
                     else:
-                        # immediate item apply for non-weapon treasures; mark rewarded (but do NOT hide chest)
                         player.apply_item(room.treasure.type)
                         room.treasure.rewarded = True
                 else:
-                    # if chest already opened but not rewarded (edge cases), ensure we don't re-grant
                     if getattr(room.treasure, 'rewarded', False):
                         pass
 
@@ -746,17 +712,13 @@ def main():
 
         room.draw(screen)
         player.draw(screen)
-        for p in projectiles:
-            p.draw(screen)
-
-        # update/draw effects
+        for p in projectiles: p.draw(screen)
         new_effects = []
         for e in effects:
             if not e.update():
                 e.draw(screen)
                 new_effects.append(e)
         effects = new_effects
-
         draw_minimap(screen, dungeon)
         draw_stats(screen, player)
 
@@ -777,7 +739,6 @@ def main():
         if pygame.time.get_ticks() - player.last_effect_time < 2000:
             text = font.render(player.last_effect_text, True, WHITE)
             screen.blit(text, (WIDTH//2 - text.get_width()//2, 50))
-
         if room.is_boss and all(not e.alive for e in room.enemies):
             text = font.render("던전 클리어!", True, YELLOW)
             screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//2))
@@ -785,7 +746,6 @@ def main():
             pygame.time.delay(3000)
             pygame.quit()
             sys.exit()
-
         pygame.display.flip()
         clock.tick(60)
 
