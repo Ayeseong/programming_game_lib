@@ -14,7 +14,6 @@ ensure_packages(["pygame", "requests"])
 import pygame
 import math
 import random
-import os
 import requests
 from io import BytesIO
 
@@ -22,47 +21,34 @@ pygame.init()
 
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Music Roguelike - Full System")
+pygame.display.set_caption("The Artists : Composer's Adventure (Music Roguelike)")
 clock = pygame.time.Clock()
-
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-GRAY = (100, 100, 100)
-GREEN = (50, 200, 50)
-RED = (200, 50, 50)
-YELLOW = (240, 200, 50)
-LIGHT_GRAY = (150, 150, 150)
-BLUE = (50, 100, 255)
-ORANGE = (255, 150, 50)
 
 HELP_TEXTS = [
     "클릭하여 다음 도움말을 확인하세요",
     "게임에 필요한 이미지를 Github에서 불러오고 있습니다",
-    "이미지 파일이 저장되지는 않으니 안심하세요",
+    "이미지는 제가 다 직접 그렸습니다!",
     "이 게임은 wasd, 그리고 마우스 좌클릭으로 조작합니다",
     "게임 캐릭터는 마우스 포인터 방향을 항상 바라봅니다",
     "방은 몬스터방, 보물방, 보스방이 있습니다",
-    "보스를 처치하면 게임을 클리어 합니다"
-
+    "보스를 처치하면 게임을 클리어 합니다",
+    "거리조절이 핵심 입니다!",
+    "보스방은 각 네 모서리 방 중에 하나입니다",
+    "성수쌤 사랑합니다"
 ]
-
-def show_loading_screen(current=0, total=0, dots=0, help_idx=0):
-    screen.fill(BLACK)
+def show_loading_screen(current=0, total=0, help_idx=0):
+    screen.fill((0, 0, 0))
     font = pygame.font.SysFont('Noto sans KR', 36)
-    msg = "이미지 불러오는 중..."
-    text = font.render(msg, True, WHITE)
-    screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//2 - 95))
-    dot_strs = ["", ".", "..", "..."]
-    dot_text = font.render(dot_strs[dots % 4], True, WHITE)
-    screen.blit(dot_text, (WIDTH//2 - dot_text.get_width()//2, HEIGHT//2 - 40))
+    text = font.render("이미지 불러오는 중...", True, (255, 255, 255))
+    screen.blit(font.render("이미지 불러오는 중...", True, (255, 255, 255)), (WIDTH//2 - text.get_width()//2, HEIGHT//2 - 50))
     if total > 0:
         prog_msg = f"{current}/{total}"
-        prog_text = font.render(prog_msg, True, WHITE)
+        prog_text = font.render(prog_msg, True, (255, 255, 255))
         screen.blit(prog_text, (WIDTH//2 - prog_text.get_width()//2, HEIGHT//2))
     help_font = pygame.font.SysFont('Noto sans KR', 24)
     help_lines = HELP_TEXTS[help_idx % len(HELP_TEXTS)].split('\n')
-    for i, hline in enumerate(help_lines):
-        help_text = help_font.render(hline, True, LIGHT_GRAY)
+    for i, line in enumerate(help_lines):
+        help_text = help_font.render(line, True, (150, 150, 150))
         screen.blit(help_text, (WIDTH//2 - help_text.get_width()//2, HEIGHT//2 + 60 + i*32))
     pygame.display.flip()
 
@@ -70,25 +56,19 @@ def load_images_with_ui(image_files):
     images = {}
     total = len(image_files)
     help_idx = 0
-    dots = 0
-    for idx, key_fname in enumerate(image_files):
-        for i in range(12):
-            show_loading_screen(idx+1, total, dots, help_idx)
-            pygame.time.delay(50)
-            dots += 1
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit(); sys.exit()
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    help_idx += 1
-        key, fname = key_fname
-        images[key] = load_image_from_github(fname)
+    for idx, key_name in enumerate(image_files):
+        show_loading_screen(idx+1, total, help_idx)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                help_idx += 1
+        key, name = key_name
+        images[key] = load_image(name)
     return images
 
-GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH = "Ayeseong", "programming_game_lib", "main"
-RAW_BASE = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/Img"
-def load_image_from_github(filename):
-    url = f"{RAW_BASE}/{filename}"
+def load_image(filename):
+    url = f"https://raw.githubusercontent.com/Ayeseong/programming_game_lib/main/Img/{filename}"
     try:
         resp = requests.get(url, timeout=5)
         resp.raise_for_status()
@@ -125,10 +105,10 @@ except pygame.error:
 IMAGES = load_images_with_ui(IMAGE_FILES)
 
 class Weapon:
-    def __init__(self, name, attack_damage, wtype="melee", attack_range=70, attack_angle=90, projectile_speed=10, cooldown=20, shape="rect"):
+    def __init__(self, name, attack_damage, type="근접", attack_range=70, attack_angle=90, projectile_speed=10, cooldown=20, shape="rect"):
         self.name = name
         self.attack_damage = attack_damage
-        self.type = wtype
+        self.type = type
         self.attack_range = attack_range
         self.attack_angle = attack_angle
         self.projectile_speed = projectile_speed
@@ -136,22 +116,19 @@ class Weapon:
         self.shape = shape
 
 WEAPON_PREFABS = [
-    Weapon("어쿠스틱 기타", 10, wtype="melee", attack_range=100, attack_angle=90, cooldown=20, shape="sword"),
-    Weapon("피아노 조율용 도끼", 14, wtype="melee", attack_range=80, attack_angle=70, cooldown=28, shape="axe"),
-    Weapon("드럼 스틱", 12, wtype="melee", attack_range=130, attack_angle=40, cooldown=26, shape="spear"),
-    Weapon("바이올린", 9, wtype="ranged", attack_range=350, projectile_speed=12, cooldown=100, shape="bow"),
-    Weapon("보컬 마이크", 8, wtype="ranged", attack_range=400, projectile_speed=15, cooldown=12, shape="wand"),
-    Weapon("단검", 11, wtype="ranged", attack_range=420, projectile_speed=18, cooldown=30, shape="knife"),
+    Weapon("어쿠스틱 기타", 10, type="근접", attack_range=100, attack_angle=90, cooldown=20, shape="sword"),
+    Weapon("피아노 조율용 망치", 14, type="근접", attack_range=80, attack_angle=70, cooldown=28, shape="axe"),
+    Weapon("드럼 스틱", 8, type="근접", attack_range=130, attack_angle=40, cooldown=18, shape="spear"),
+    Weapon("바이올린", 9, type="원거리", attack_range=350, projectile_speed=12, cooldown=50, shape="bow"),
+    Weapon("보컬 마이크", 8, type="원거리", attack_range=400, projectile_speed=15, cooldown=12, shape="wand"),
+    Weapon("단검", 11, type="원거리", attack_range=420, projectile_speed=18, cooldown=5, shape="knife"),
 ]
 
 class Player:
     def __init__(self, x=None, y=None):
         self.size = 40
-        if x is None:
-            x = WIDTH // 2 - self.size // 2
-        if y is None:
-            y = HEIGHT // 2 - self.size // 2
-        self.x, self.y = x, y
+        self.x = WIDTH // 2 - self.size // 2 if x is None else x
+        self.y = HEIGHT // 2 - self.size // 2 if y is None else y
         self.speed = 5
         self.hp = 100
         self.max_hp = 100
@@ -161,7 +138,7 @@ class Player:
         self.attack_range = 70
         self.last_effect_time = 0
         self.last_effect_text = ""
-        self.weapon = Weapon("어쿠스틱 기타", 10, wtype="melee", attack_range=100, attack_angle=90, cooldown=20, shape="sword")
+        self.weapon = Weapon("어쿠스틱 기타", 10, type="근접", attack_range=100, attack_angle=90, cooldown=20, shape="sword")
         self.facing_angle = 0.0
 
     def handle_input(self):
@@ -182,7 +159,7 @@ class Player:
         w = self.weapon
         cx = self.x + self.size / 2
         cy = self.y + self.size / 2
-        if w.type == "melee":
+        if w.type == "근접":
             motion_name = None
             if w.shape == "sword": motion_name = "sword_motion"
             elif w.shape == "spear": motion_name = "spear_motion"
@@ -191,7 +168,7 @@ class Player:
                 mx = cx + math.cos(self.facing_angle) * (self.size * 0.75)
                 my = cy + math.sin(self.facing_angle) * (self.size * 0.75)
                 effects.append(Effect(mx, my, IMAGES.get(motion_name), lifetime=220, angle=self.facing_angle))
-        if w.type == "melee":
+        if w.type == "근접":
             for enemy in enemies:
                 if not enemy.alive: continue
                 ex = enemy.x + enemy.size / 2
@@ -233,39 +210,33 @@ class Player:
         self.x = max(0, min(WIDTH - self.size, self.x))
         self.y = max(0, min(HEIGHT - self.size, self.y))
 
-    def apply_item(self, item_type):
-        if item_type == "atk_up":
+    def apply_item(self, t):
+        if t == "atk_up":
             self.attack_damage += 1
-            text = "공격력 +1!"
-        elif item_type == "spd_up":
+            msg = "공격력 +1!"
+        elif t == "spd_up":
             self.speed += 0.5
-            text = "이동속도 +0.5!"
-        elif item_type == "heal":
+            msg = "이동속도 +0.5!"
+        elif t == "heal":
             self.hp = min(self.max_hp, self.hp + 20)
-            text = "체력회복 +20!"
+            msg = "체력회복 +20!"
         else:
-            text = ""
-        self.last_effect_text = text
+            msg = ""
+        self.last_effect_text = msg
         self.last_effect_time = pygame.time.get_ticks()
 
     def draw(self, surface):
         cx = self.x + self.size / 2
         cy = self.y + self.size / 2
         p_img = IMAGES.get('player')
-        if p_img:
-            target_size = (self.size, self.size)
-            img = pygame.transform.smoothscale(p_img, target_size)
-            deg = -math.degrees(self.facing_angle) + 90
-            rotated = pygame.transform.rotate(img, deg)
-            rect = rotated.get_rect(center=(cx, cy))
-            surface.blit(rotated, rect.topleft)
-        else:
-            body_surf = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
-            pygame.draw.rect(body_surf, BLUE, (0, 0, self.size, self.size))
-            deg = -math.degrees(self.facing_angle) + 90
-            rotated = pygame.transform.rotate(body_surf, deg)
-            rect = rotated.get_rect(center=(cx, cy))
-            surface.blit(rotated, rect.topleft)
+
+        target_size = (self.size, self.size)
+        img = pygame.transform.smoothscale(p_img, target_size)
+        deg = -math.degrees(self.facing_angle) + 90
+        rotated = pygame.transform.rotate(img, deg)
+        rect = rotated.get_rect(center=(cx, cy))
+        surface.blit(rotated, rect.topleft)
+
         draw_weapon_visual(surface, (cx, cy), self.facing_angle, self.weapon, self.size)
         self.draw_health_bar(surface)
 
@@ -274,63 +245,35 @@ class Player:
         bar_height = 8
         x = self.x + (self.size / 2) - (bar_width / 2)
         y = self.y - 15
-        pygame.draw.rect(surface, RED, (x, y, bar_width, bar_height))
+        pygame.draw.rect(surface, (200, 50, 50), (x, y, bar_width, bar_height))
         hp_ratio = self.hp / self.max_hp
-        pygame.draw.rect(surface, GREEN, (x, y, bar_width * hp_ratio, bar_height))
+        pygame.draw.rect(surface, (50, 200, 50), (x, y, bar_width * hp_ratio, bar_height))
 
 def draw_weapon_visual(surface, center, facing_angle, weapon, player_size):
     cx, cy = center
     desired = int(player_size * 1.2)
     img = IMAGES.get(weapon.shape)
-    if img:
-        iw, ih = img.get_size()
-        scale = desired / max(iw, ih)
-        new_w, new_h = max(1, int(iw * scale)), max(1, int(ih * scale))
-        img_s = pygame.transform.smoothscale(img, (new_w, new_h))
-        deg = -math.degrees(facing_angle)
-        rotated = pygame.transform.rotate(img_s, deg)
-        rect = rotated.get_rect(center=(cx + math.cos(facing_angle)*(player_size*0.45), cy + math.sin(facing_angle)*(player_size*0.45)))
-        surface.blit(rotated, rect.topleft)
-        return
-    size = int(player_size * 0.9)
-    ws = int(size * 1.2)
-    surf = pygame.Surface((ws, ws), pygame.SRCALPHA)
-    color = LIGHT_GRAY
-    s = ws
-    if weapon.shape == "sword":
-        pygame.draw.rect(surf, color, (s*0.45, s*0.25, s*0.12, s*0.5))
-        pygame.draw.polygon(surf, color, [(s*0.45, s*0.25),(s*0.45+s*0.12, s*0.25),(s*0.6, s*0.12)])
-    elif weapon.shape == "axe":
-        pygame.draw.rect(surf, color, (s*0.42, s*0.28, s*0.08, s*0.44))
-        pygame.draw.circle(surf, color, (int(s*0.55), int(s*0.3)), int(s*0.18))
-    elif weapon.shape == "spear":
-        pygame.draw.rect(surf, color, (s*0.43, s*0.15, s*0.06, s*0.7))
-        pygame.draw.polygon(surf, color, [(s*0.43, s*0.15),(s*0.43+s*0.06, s*0.15),(s*0.5, s*0.05)])
-    elif weapon.shape == "bow":
-        pygame.draw.arc(surf, color, (s*0.3, s*0.15, s*0.6, s*0.7), math.radians(60), math.radians(300), 3)
-        pygame.draw.line(surf, color, (s*0.3, s*0.5), (s*0.9, s*0.5), 1)
-    elif weapon.shape == "wand":
-        pygame.draw.rect(surf, color, (s*0.46, s*0.25, s*0.06, s*0.5))
-        pygame.draw.circle(surf, color, (int(s*0.5), int(s*0.2)), int(s*0.06))
-    elif weapon.shape == "knife":
-        pygame.draw.polygon(surf, color, [(s*0.45, s*0.35),(s*0.6, s*0.5),(s*0.45, s*0.65)])
-    else:
-        pygame.draw.rect(surf, color, (s*0.45, s*0.35, s*0.12, s*0.3))
+
+    iw, ih = img.get_size()
+    scale = desired / max(iw, ih)
+    new_w, new_h = max(1, int(iw * scale)), max(1, int(ih * scale))
+    img_s = pygame.transform.smoothscale(img, (new_w, new_h))
     deg = -math.degrees(facing_angle)
-    rotated = pygame.transform.rotate(surf, deg)
+    rotated = pygame.transform.rotate(img_s, deg)
     rect = rotated.get_rect(center=(cx + math.cos(facing_angle)*(player_size*0.45), cy + math.sin(facing_angle)*(player_size*0.45)))
     surface.blit(rotated, rect.topleft)
+    return
 
 class Enemy:
     def __init__(self, x, y, is_boss=False):
         self.x, self.y = x, y
         self.is_boss = is_boss
         self.size = 60 if is_boss else 40
-        self.color = ORANGE if is_boss else RED
+        self.color = (255, 150, 50) if is_boss else (200, 50, 50)
         self.hp = 300 if is_boss else 50
         self.max_hp = self.hp
-        self.speed = 1.5 if is_boss else 2
-        self.attack_damage = 15 if is_boss else 5
+        self.speed = 4 if is_boss else 2
+        self.attack_damage = 20 if is_boss else 5
         self.attack_cooldown = 0
         self.attack_range = 50
         self.alive = True
@@ -338,7 +281,7 @@ class Enemy:
     def update(self, player):
         if not self.alive: return
         dx, dy = player.x - self.x, player.y - self.y
-        distance = math.sqrt(dx ** 2 + dy ** 2)
+        distance = math.hypot(dx, dy)
         if distance > 0:
             self.x += (dx / distance) * self.speed
             self.y += (dy / distance) * self.speed
@@ -363,15 +306,15 @@ class Enemy:
         bar_height = 6
         x = self.x + (self.size / 2) - (bar_width / 2)
         y = self.y - 10
-        pygame.draw.rect(surface, RED, (x, y, bar_width, bar_height))
+        pygame.draw.rect(surface, (200, 50, 50), (x, y, bar_width, bar_height))
         hp_ratio = self.hp / self.max_hp
-        pygame.draw.rect(surface, GREEN, (x, y, bar_width * hp_ratio, bar_height))
+        pygame.draw.rect(surface, (50, 200, 50), (x, y, bar_width * hp_ratio, bar_height))
 
 class Treasure:
     def __init__(self, x, y, current_weapon_name=None):
         self.x, self.y = x, y
         self.size = 30
-        self.color = YELLOW
+        self.color = (240, 200, 50)
         self.type = random.choice(["atk_up", "spd_up", "heal"])
         self.collected = False
         self.opened = False
@@ -386,15 +329,12 @@ class Treasure:
     def draw(self, surface):
         key = 'treasure_opened' if self.opened else 'treasure_closed'
         img = IMAGES.get(key)
-        if img:
-            iw, ih = img.get_size()
-            target = 48
-            scale = target / max(iw, ih)
-            img_s = pygame.transform.smoothscale(img, (max(1,int(iw*scale)), max(1,int(ih*scale))))
-            surface.blit(img_s, (self.x - img_s.get_width()//2, self.y - img_s.get_height()//2))
-        else:
-            col = LIGHT_GRAY if self.opened else self.color
-            pygame.draw.circle(surface, col, (self.x, self.y), self.size // 2)
+
+        iw, ih = img.get_size()
+        target = 48
+        scale = target / max(iw, ih)
+        img_s = pygame.transform.smoothscale(img, (max(1,int(iw*scale)), max(1,int(ih*scale))))
+        surface.blit(img_s, (self.x - img_s.get_width()//2, self.y - img_s.get_height()//2))
 
 class Room:
     def __init__(self, room_type="monster", is_boss=False, coord=(0,0), dungeon_size=5, current_weapon_name=None):
@@ -430,7 +370,7 @@ class Room:
             enemy.update(player)
     def draw(self, surface):
         pygame.draw.rect(surface, (30, 30, 30), (0, 0, WIDTH, HEIGHT))
-        for rect in self.doors.values(): pygame.draw.rect(surface, YELLOW, rect)
+        for rect in self.doors.values(): pygame.draw.rect(surface, (240, 200, 50), rect)
         if self.room_type == "monster" or self.is_boss:
             for enemy in self.enemies: enemy.draw(surface)
         elif self.room_type == "treasure" and self.treasure:
@@ -446,12 +386,11 @@ class Dungeon:
         self.generate_rooms(current_weapon_name)
 
     def generate_rooms(self, current_weapon_name):
-        coords = self.room_coords.copy()
-        total_rooms = len(coords)
+        coords = self.room_coords
         start_room = self.current_room
         boss_pos = coords[-1]
-        treasure_count = max(1, int(round(total_rooms * 0.2)))
-        selectable_rooms = [c for c in coords if c != boss_pos and c != start_room]
+        treasure_count = max(1, int(round(len(coords) * 0.2)))
+        selectable_rooms = [c for c in coords if c not in (boss_pos, start_room)]
         treasure_coords = random.sample(selectable_rooms, treasure_count)
         for coord in coords:
             if coord == boss_pos:
@@ -480,21 +419,20 @@ def draw_minimap(surface, dungeon):
     size = 12
     offset = 10
     for (x, y), room in dungeon.rooms.items():
-        color = LIGHT_GRAY
         if (x, y) in dungeon.visited:
-            if room.is_boss: color = ORANGE
-            elif room.room_type == "treasure": color = YELLOW
-            else: color = GREEN
+            color = (255, 150, 50) if room.is_boss else ((240, 200, 50) if room.room_type == "treasure" else (50, 200, 50))
+        else:
+            color = (150, 150, 150)
         rect = pygame.Rect(offset + x * size, offset + y * size, 10, 10)
         pygame.draw.rect(map_surface, color, rect)
         if (x, y) == dungeon.current_room:
-            pygame.draw.rect(map_surface, WHITE, rect, 2)
+            pygame.draw.rect(map_surface, (255, 255, 255), rect, 2)
     surface.blit(map_surface, (20, 20))
 
 def draw_stats(surface, player):
-    stats = f"HP: {int(player.hp)}/{player.max_hp} | ATK: {player.weapon.attack_damage} ({player.weapon.name}) | TYPE: {player.weapon.type} | SPD: {round(player.speed,1)} | KB: {player.knockback}"
-    text = font.render(stats, True, WHITE)
-    surface.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT - 40))
+    stats = f"HP: {int(player.hp)}/{player.max_hp} | ATK: {player.weapon.attack_damage} ({player.weapon.name}) | TYPE: {player.weapon.type} | SPD: {round(player.speed,1)}"
+    text = font.render(stats, True, (255, 255, 255))
+    surface.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT - 60))
 
 class Projectile:
     def __init__(self, x, y, dir_x, dir_y, speed, damage, radius=6, shape=None):
@@ -519,14 +457,14 @@ class Projectile:
             ecx = enemy.x + enemy.size / 2
             ecy = enemy.y + enemy.size / 2
             dist = math.hypot(self.x - ecx, self.y - ecy)
-            if dist <= self.radius + max(enemy.size, enemy.size) / 2 * 0.5:
+            if dist <= self.radius + enemy.size * 0.25:
                 enemy.take_damage(self.damage)
                 eff_name = None
                 if self.shape == "wand": eff_name = "wand_effect"
                 elif self.shape == "spear": eff_name = "spear_effect"
                 elif self.shape == "sword": eff_name = "sword_effect"
                 if eff_name:
-                    effects.append(Effect(ecx, ecy, IMAGES.get(eff_name), angle=math.atan2(self.dy, self.dx)))
+                    effects.append(Effect(ecx, ecy, IMAGES.get(eff_name), angle=int(math.atan2(self.dy, self.dx))))
                 if self.shape != "bow":
                     self.alive = False
                     break
@@ -551,16 +489,15 @@ class Projectile:
     def draw(self, surface):
         if not self.alive: return
         proj_img = IMAGES.get(f"{self.shape}_projectile") or IMAGES.get(self.shape) if self.shape else None
-        if proj_img:
-            iw, ih = proj_img.get_size()
-            scale = max(1, int(self.radius*2))
-            img_s = pygame.transform.smoothscale(proj_img, (scale, scale))
-            deg = -math.degrees(math.atan2(self.dy, self.dx))
-            rotated = pygame.transform.rotate(img_s, deg)
-            rect = rotated.get_rect(center=(int(self.x), int(self.y)))
-            surface.blit(rotated, rect.topleft)
-            return
-        pygame.draw.circle(surface, LIGHT_GRAY, (int(self.x), int(self.y)), self.radius)
+
+        iw, ih = proj_img.get_size()
+        scale = max(1, int(self.radius*2))
+        img_s = pygame.transform.smoothscale(proj_img, (scale, scale))
+        deg = -math.degrees(math.atan2(self.dy, self.dx))
+        rotated = pygame.transform.rotate(img_s, deg)
+        rect = rotated.get_rect(center=(int(self.x), int(self.y)))
+        surface.blit(rotated, rect.topleft)
+        return
 
 class Effect:
     def __init__(self, x, y, image=None, lifetime=400, angle=0):
@@ -575,16 +512,14 @@ class Effect:
         return pygame.time.get_ticks() - self.start >= self.lifetime
 
     def draw(self, surface):
-        if self.image:
-            iw, ih = self.image.get_size()
-            target = 48
-            scale = target / max(iw, ih)
-            img_s = pygame.transform.smoothscale(self.image, (max(1,int(iw*scale)), max(1,int(ih*scale))))
-            deg = -math.degrees(self.angle)
-            rotated = pygame.transform.rotate(img_s, deg)
-            surface.blit(rotated, (self.x - rotated.get_width()//2, self.y - rotated.get_height()//2))
-        else:
-            pygame.draw.circle(surface, YELLOW, (int(self.x), int(self.y)), 10)
+
+        iw, ih = self.image.get_size()
+        target = 48
+        scale = target / max(iw, ih)
+        img_s = pygame.transform.smoothscale(self.image, (max(1,int(iw*scale)), max(1,int(ih*scale))))
+        deg = -math.degrees(self.angle)
+        rotated = pygame.transform.rotate(img_s, deg)
+        surface.blit(rotated, (self.x - rotated.get_width()//2, self.y - rotated.get_height()//2))
 
 def select_difficulty():
     btn_w, btn_h = 220, 60
@@ -593,8 +528,8 @@ def select_difficulty():
     total_h = btn_h * len(labels) + spacing * (len(labels) - 1)
     start_y = HEIGHT // 2 - total_h // 2
     while True:
-        screen.fill(BLACK)
-        title = font.render("Select Difficulty", True, YELLOW)
+        screen.fill((0, 0, 0))
+        title = font.render("난이도를 설정하세요", True, (240, 200, 50))
         screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4 - title.get_height()//2))
 
         mx, my = pygame.mouse.get_pos()
@@ -609,15 +544,12 @@ def select_difficulty():
             x = WIDTH // 2 - btn_w // 2
             y = start_y + i * (btn_h + spacing)
             rect = pygame.Rect(x, y, btn_w, btn_h)
-            color = LIGHT_GRAY if rect.collidepoint(mx, my) else GRAY
+            color = (150, 150, 150) if rect.collidepoint(mx, my) else (100, 100, 100)
             pygame.draw.rect(screen, color, rect, border_radius=8)
-            txt = font.render(label, True, WHITE)
+            txt = font.render(label, True, (255, 255, 255))
             screen.blit(txt, (x + btn_w//2 - txt.get_width()//2, y + btn_h//2 - txt.get_height()//2))
             if clicked and rect.collidepoint(mx, my):
                 return label
-
-        hint = font.render("Click a button to start", True, LIGHT_GRAY)
-        screen.blit(hint, (WIDTH//2 - hint.get_width()//2, HEIGHT - 60))
 
         pygame.display.flip()
         clock.tick(60)
@@ -637,7 +569,7 @@ def main():
 
     running = True
     while running:
-        screen.fill(BLACK)
+        screen.fill((0, 0, 0))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
@@ -673,7 +605,7 @@ def main():
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
             screen.blit(overlay, (0, 0))
-            go_text = font.render("GAME OVER", True, RED)
+            go_text = font.render("GAME OVER", True, (200, 50, 50))
             screen.blit(go_text, (WIDTH//2 - go_text.get_width()//2, HEIGHT//2 - go_text.get_height()//2))
             pygame.display.flip()
             pygame.time.delay(3000)
@@ -696,18 +628,15 @@ def main():
                     if getattr(room.treasure, 'rewarded', False):
                         pass
 
-        moved = False
         for direction, rect in room.doors.items():
             if pygame.Rect(player.x, player.y, player.size, player.size).colliderect(rect):
                 if any(e.alive for e in room.enemies):
                     player.last_effect_text = "방을 정리해야 이동할 수 있습니다."
                     player.last_effect_time = pygame.time.get_ticks()
-                    moved = False
                     break
                 dungeon.move_room(direction)
                 player.x, player.y = WIDTH//2, HEIGHT//2
                 projectiles.clear()
-                moved = True
                 break
 
         room.draw(screen)
@@ -727,20 +656,20 @@ def main():
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
             screen.blit(overlay, (0, 0))
-            title = font.render("무기 발견!", True, YELLOW)
-            new_line = font.render(f"새 무기: {w.name}  ATK {w.attack_damage}  TYPE {w.type}", True, WHITE)
-            cur_line = font.render(f"현재 무기: {player.weapon.name}  ATK {player.weapon.attack_damage}  TYPE {player.weapon.type}", True, WHITE)
-            hint = font.render("Y: 장착   N: 유지", True, LIGHT_GRAY)
+            title = font.render("무기 발견!", True, (240, 200, 50))
+            new_line = font.render(f"새 무기: {w.name}  ATK {w.attack_damage}  TYPE {w.type}", True, (255, 255, 255))
+            cur_line = font.render(f"현재 무기: {player.weapon.name}  ATK {player.weapon.attack_damage}  TYPE {player.weapon.type}", True, (255, 255, 255))
+            hint = font.render("Y: 장착   N: 유지", True, (150, 150, 150))
             screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//2 - 80))
             screen.blit(new_line, (WIDTH//2 - new_line.get_width()//2, HEIGHT//2 - 40))
             screen.blit(cur_line, (WIDTH//2 - cur_line.get_width()//2, HEIGHT//2))
             screen.blit(hint, (WIDTH//2 - hint.get_width()//2, HEIGHT//2 + 60))
 
         if pygame.time.get_ticks() - player.last_effect_time < 2000:
-            text = font.render(player.last_effect_text, True, WHITE)
+            text = font.render(player.last_effect_text, True, (255, 255, 255))
             screen.blit(text, (WIDTH//2 - text.get_width()//2, 50))
         if room.is_boss and all(not e.alive for e in room.enemies):
-            text = font.render("던전 클리어!", True, YELLOW)
+            text = font.render("던전 클리어!", True, (240, 200, 50))
             screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//2))
             pygame.display.flip()
             pygame.time.delay(3000)
@@ -749,5 +678,4 @@ def main():
         pygame.display.flip()
         clock.tick(60)
 
-if __name__ == "__main__":
-    main()
+main()
